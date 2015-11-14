@@ -79,12 +79,18 @@ public final class DataEntryActivity extends Activity implements TextWatcher {
     private ImageView cardView;
     private Button doneBtn;
     private Button cancelBtn;
-    private CreditCard capture;
 
-    private boolean autoAcceptDone;
     private String labelLeftPadding;
-    private boolean useApplicationTheme;
     private int defaultTextColor;
+    private int paddingPx;
+
+    private boolean useApplicationTheme;
+    private CreditCard capture;
+    private boolean autoAcceptDone;
+    private boolean requireExpiry;
+    private boolean requireCVV;
+    private boolean requirePostalCode;
+    private boolean requireCardholderName;
 
     private final String TAG = this.getClass().getName();
 
@@ -100,6 +106,14 @@ public final class DataEntryActivity extends Activity implements TextWatcher {
         }
 
         useApplicationTheme = getIntent().getBooleanExtra(CardIOActivity.EXTRA_KEEP_APPLICATION_THEME, false);
+        capture = getIntent().getParcelableExtra(CardIOActivity.EXTRA_SCAN_RESULT);
+        autoAcceptDone = getIntent().getBooleanExtra("debug_autoAcceptResult", false);
+        requireExpiry = getIntent().getBooleanExtra(CardIOActivity.EXTRA_REQUIRE_EXPIRY, false);
+        requireCVV = getIntent().getBooleanExtra(CardIOActivity.EXTRA_REQUIRE_CVV, false);
+        requirePostalCode = getIntent().getBooleanExtra(CardIOActivity.EXTRA_REQUIRE_POSTAL_CODE, false);
+        requireCardholderName = getIntent().getBooleanExtra(CardIOActivity.EXTRA_REQUIRE_CARDHOLDER_NAME, false);
+
+        ActivityHelper.addActionBarIfSupported(this);
         ActivityHelper.setActivityTheme(this, useApplicationTheme);
 
         defaultTextColor = new TextView(this).getTextColors().getDefaultColor();
@@ -109,301 +123,9 @@ public final class DataEntryActivity extends Activity implements TextWatcher {
 
         LocalizedStrings.setLanguage(getIntent());
 
-        int paddingPx = ViewUtil.typedDimensionValueToPixelsInt(PADDING_DIP, this);
+        paddingPx = ViewUtil.typedDimensionValueToPixelsInt(PADDING_DIP, this);
 
-        RelativeLayout container = new RelativeLayout(this);
-        if( !useApplicationTheme ) {
-            container.setBackgroundColor(Appearance.DEFAULT_BACKGROUND_COLOR);
-        }
-        ScrollView scrollView = new ScrollView(this);
-        scrollView.setId(viewIdCounter++);
-        RelativeLayout.LayoutParams scrollParams = new RelativeLayout.LayoutParams(
-                LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
-        scrollParams.addRule(RelativeLayout.ALIGN_PARENT_TOP);
-        container.addView(scrollView, scrollParams);
-
-        LinearLayout wrapperLayout = new LinearLayout(this);
-        wrapperLayout.setOrientation(LinearLayout.VERTICAL);
-        scrollView.addView(wrapperLayout, LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT);
-
-        LinearLayout mainLayout = new LinearLayout(this);
-        mainLayout.setOrientation(LinearLayout.VERTICAL);
-        LinearLayout.LayoutParams mainParams = new LinearLayout.LayoutParams(
-                LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT);
-
-        capture = getIntent().getParcelableExtra(CardIOActivity.EXTRA_SCAN_RESULT);
-
-        autoAcceptDone = getIntent().getBooleanExtra("debug_autoAcceptResult", false);
-
-        if (capture != null) {
-            numberValidator = new CardNumberValidator(capture.cardNumber);
-
-            cardView = new ImageView(this);
-
-            LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(
-                    LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
-            cardView.setPadding(0, 0, 0, paddingPx);
-            cardParams.weight = 1;
-
-            // static access is necessary, else we see weird crashes on some devices.
-            cardView.setImageBitmap(io.card.payment.CardIOActivity.markedCardImage);
-
-            mainLayout.addView(cardView, cardParams);
-            ViewUtil.setMargins(cardView, null, null, null, Appearance.VERTICAL_SPACING);
-
-        } else {
-
-            activityTitleTextView = new TextView(this);
-            activityTitleTextView.setTextSize(24);
-            if(! useApplicationTheme ) {
-                activityTitleTextView.setTextColor(Appearance.PAY_BLUE_COLOR);
-            }
-            mainLayout.addView(activityTitleTextView);
-            ViewUtil.setPadding(activityTitleTextView, null, null, null,
-                    Appearance.VERTICAL_SPACING);
-            ViewUtil.setDimensions(activityTitleTextView, LayoutParams.WRAP_CONTENT,
-                    LayoutParams.WRAP_CONTENT);
-
-            LinearLayout numberLayout = new LinearLayout(this);
-            numberLayout.setOrientation(LinearLayout.VERTICAL);
-            ViewUtil.setPadding(numberLayout, null, PADDING_DIP, null, PADDING_DIP);
-
-            TextView numberLabel = new TextView(this);
-            ViewUtil.setPadding(numberLabel, labelLeftPadding, null, null, null);
-            numberLabel.setText(LocalizedStrings.getString(StringKey.ENTRY_CARD_NUMBER));
-            if(! useApplicationTheme ) {
-                numberLabel.setTextColor(Appearance.TEXT_COLOR_LABEL);
-            }
-            numberLayout.addView(numberLabel, LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
-
-            numberEdit = new EditText(this);
-            numberEdit.setId(editTextIdCounter++);
-            numberEdit.setMaxLines(1);
-            numberEdit.setImeOptions(EditorInfo.IME_ACTION_DONE);
-            numberEdit.setTextAppearance(getApplicationContext(),
-                    android.R.attr.textAppearanceLarge);
-            numberEdit.setInputType(InputType.TYPE_CLASS_PHONE);
-            numberEdit.setHint("1234 5678 1234 5678");
-            if(! useApplicationTheme ) {
-                numberEdit.setHintTextColor(Appearance.TEXT_COLOR_EDIT_TEXT_HINT);
-            }
-
-            numberValidator = new CardNumberValidator();
-            numberEdit.addTextChangedListener(numberValidator);
-            numberEdit.addTextChangedListener(this);
-            numberEdit.setFilters(new InputFilter[] { new DigitsKeyListener(), numberValidator });
-
-            numberLayout.addView(numberEdit, LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
-            mainLayout.addView(numberLayout, LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT);
-        }
-
-        LinearLayout optionLayout = new LinearLayout(this);
-        LinearLayout.LayoutParams optionLayoutParam = new LinearLayout.LayoutParams(
-                LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
-        ViewUtil.setPadding(optionLayout, null, PADDING_DIP, null, PADDING_DIP);
-        optionLayout.setOrientation(LinearLayout.HORIZONTAL);
-
-        boolean requireExpiry = getIntent().getBooleanExtra(CardIOActivity.EXTRA_REQUIRE_EXPIRY, false);
-        boolean requireCVV = getIntent().getBooleanExtra(CardIOActivity.EXTRA_REQUIRE_CVV, false);
-        boolean requirePostalCode = getIntent().getBooleanExtra(CardIOActivity.EXTRA_REQUIRE_POSTAL_CODE, false);
-
-        if (requireExpiry) {
-            LinearLayout expiryLayout = new LinearLayout(this);
-            LinearLayout.LayoutParams expiryLayoutParam = new LinearLayout.LayoutParams(0,
-                    LayoutParams.MATCH_PARENT, 1);
-            expiryLayout.setOrientation(LinearLayout.VERTICAL);
-
-            TextView expiryLabel = new TextView(this);
-            if(! useApplicationTheme ) {
-                expiryLabel.setTextColor(Appearance.TEXT_COLOR_LABEL);
-            }
-            expiryLabel.setText(LocalizedStrings.getString(StringKey.ENTRY_EXPIRES));
-            ViewUtil.setPadding(expiryLabel, labelLeftPadding, null, null, null);
-
-            expiryLayout.addView(expiryLabel, LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
-
-            expiryEdit = new EditText(this);
-            expiryEdit.setId(editTextIdCounter++);
-            expiryEdit.setMaxLines(1);
-            expiryEdit.setImeOptions(EditorInfo.IME_ACTION_DONE);
-            expiryEdit.setTextAppearance(getApplicationContext(),
-                    android.R.attr.textAppearanceLarge);
-            expiryEdit.setInputType(InputType.TYPE_CLASS_PHONE);
-            expiryEdit.setHint(LocalizedStrings.getString(StringKey.EXPIRES_PLACEHOLDER));
-            if(! useApplicationTheme ) {
-                expiryEdit.setHintTextColor(Appearance.TEXT_COLOR_EDIT_TEXT_HINT);
-            }
-
-            if (capture != null) {
-                expiryValidator = new ExpiryValidator(capture.expiryMonth, capture.expiryYear);
-            } else {
-                expiryValidator = new ExpiryValidator();
-            }
-            if (expiryValidator.hasFullLength()) {
-                expiryEdit.setText(expiryValidator.getValue());
-            }
-            expiryEdit.addTextChangedListener(expiryValidator);
-            expiryEdit.addTextChangedListener(this);
-            expiryEdit.setFilters(new InputFilter[] { new DateKeyListener(), expiryValidator });
-
-            expiryLayout.addView(expiryEdit, LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
-            optionLayout.addView(expiryLayout, expiryLayoutParam);
-            ViewUtil.setMargins(expiryLayout, null, null,
-                    (requireCVV || requirePostalCode) ? FIELD_HALF_GUTTER : null, null);
-        } else {
-            expiryValidator = new AlwaysValid();
-        }
-
-        if (requireCVV) {
-            LinearLayout cvvLayout = new LinearLayout(this);
-            LinearLayout.LayoutParams cvvLayoutParam = new LinearLayout.LayoutParams(0,
-                    LayoutParams.MATCH_PARENT, 1);
-            cvvLayout.setOrientation(LinearLayout.VERTICAL);
-
-            TextView cvvLabel = new TextView(this);
-            if(! useApplicationTheme ) {
-                cvvLabel.setTextColor(Appearance.TEXT_COLOR_LABEL);
-            }
-            ViewUtil.setPadding(cvvLabel, labelLeftPadding, null, null, null);
-            cvvLabel.setText(LocalizedStrings.getString(StringKey.ENTRY_CVV));
-
-            cvvLayout.addView(cvvLabel, LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
-
-            cvvEdit = new EditText(this);
-            cvvEdit.setId(editTextIdCounter++);
-            cvvEdit.setMaxLines(1);
-            cvvEdit.setImeOptions(EditorInfo.IME_ACTION_DONE);
-            cvvEdit.setTextAppearance(getApplicationContext(), android.R.attr.textAppearanceLarge);
-            cvvEdit.setInputType(InputType.TYPE_CLASS_PHONE);
-            cvvEdit.setHint("123");
-            if(! useApplicationTheme ) {
-                cvvEdit.setHintTextColor(Appearance.TEXT_COLOR_EDIT_TEXT_HINT);
-            }
-
-            int length = 4;
-            if (capture != null) {
-                CardType type = CardType.fromCardNumber(numberValidator.getValue());
-                length = type.cvvLength();
-            }
-            cvvValidator = new FixedLengthValidator(length);
-            cvvEdit.setFilters(new InputFilter[] { new DigitsKeyListener(), cvvValidator });
-            cvvEdit.addTextChangedListener(cvvValidator);
-            cvvEdit.addTextChangedListener(this);
-
-            cvvLayout.addView(cvvEdit, LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
-            optionLayout.addView(cvvLayout, cvvLayoutParam);
-            ViewUtil.setMargins(cvvLayout, requireExpiry ? FIELD_HALF_GUTTER : null, null,
-                    requirePostalCode ? FIELD_HALF_GUTTER : null, null);
-        } else {
-            cvvValidator = new AlwaysValid();
-        }
-
-        if (requirePostalCode) {
-            LinearLayout postalCodeLayout = new LinearLayout(this);
-            LinearLayout.LayoutParams postalCodeLayoutParam = new LinearLayout.LayoutParams(0,
-                    LayoutParams.MATCH_PARENT, 1);
-            postalCodeLayout.setOrientation(LinearLayout.VERTICAL);
-
-            TextView zipLabel = new TextView(this);
-            if(! useApplicationTheme ) {
-                zipLabel.setTextColor(Appearance.TEXT_COLOR_LABEL);
-            }
-            ViewUtil.setPadding(zipLabel, labelLeftPadding, null, null, null);
-            zipLabel.setText(LocalizedStrings.getString(StringKey.ENTRY_POSTAL_CODE));
-
-            postalCodeLayout
-                    .addView(zipLabel, LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
-
-            postalCodeEdit = new EditText(this);
-            postalCodeEdit.setId(editTextIdCounter++);
-            postalCodeEdit.setMaxLines(1);
-            postalCodeEdit.setImeOptions(EditorInfo.IME_ACTION_DONE);
-            postalCodeEdit.setTextAppearance(getApplicationContext(),
-                    android.R.attr.textAppearanceLarge);
-            postalCodeEdit.setInputType(InputType.TYPE_CLASS_TEXT);
-            if(! useApplicationTheme ) {
-                postalCodeEdit.setHintTextColor(Appearance.TEXT_COLOR_EDIT_TEXT_HINT);
-            }
-
-            postalCodeValidator = new MaxLengthValidator(MAX_POSTAL_CODE_LENGTH);
-            postalCodeEdit.addTextChangedListener(postalCodeValidator);
-            postalCodeEdit.addTextChangedListener(this);
-
-            postalCodeLayout.addView(postalCodeEdit, LayoutParams.MATCH_PARENT,
-                    LayoutParams.WRAP_CONTENT);
-            optionLayout.addView(postalCodeLayout, postalCodeLayoutParam);
-            ViewUtil.setMargins(postalCodeLayout, (requireExpiry || requireCVV) ? FIELD_HALF_GUTTER
-                    : null, null, null, null);
-        } else {
-            postalCodeValidator = new AlwaysValid();
-        }
-
-        mainLayout.addView(optionLayout, optionLayoutParam);
-
-        addCardholderNameIfNeeded(mainLayout);
-
-        wrapperLayout.addView(mainLayout, mainParams);
-        ViewUtil.setMargins(mainLayout, Appearance.CONTAINER_MARGIN_HORIZONTAL,
-                Appearance.CONTAINER_MARGIN_VERTICAL, Appearance.CONTAINER_MARGIN_HORIZONTAL,
-                Appearance.CONTAINER_MARGIN_VERTICAL);
-
-        LinearLayout buttonLayout = new LinearLayout(this);
-        buttonLayout.setId(viewIdCounter++);
-        RelativeLayout.LayoutParams buttonLayoutParam = new RelativeLayout.LayoutParams(
-                LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
-        buttonLayoutParam.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
-        buttonLayout.setPadding(0, paddingPx, 0, 0);
-        buttonLayout.setBackgroundColor(Color.TRANSPARENT);
-
-        scrollParams.addRule(RelativeLayout.ABOVE, buttonLayout.getId());
-
-        doneBtn = new Button(this);
-        LinearLayout.LayoutParams doneParam = new LinearLayout.LayoutParams(
-                LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT, 1);
-
-        doneBtn.setText(LocalizedStrings.getString(StringKey.DONE));
-        doneBtn.setOnClickListener(new Button.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                completed();
-            }
-        });
-
-        doneBtn.setEnabled(false);
-
-        buttonLayout.addView(doneBtn, doneParam);
-        ViewUtil.styleAsButton(doneBtn, true, this, useApplicationTheme);
-        ViewUtil.setPadding(doneBtn, "5dip", null, "5dip", null);
-        ViewUtil.setMargins(doneBtn, "8dip", "8dip", "8dip", "8dip");
-        if(!useApplicationTheme) {
-            doneBtn.setTextSize(Appearance.TEXT_SIZE_MEDIUM_BUTTON);
-        }
-
-        cancelBtn = new Button(this);
-
-        LinearLayout.LayoutParams cancelParam = new LinearLayout.LayoutParams(
-                LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT, 1);
-        cancelBtn.setText(LocalizedStrings.getString(StringKey.CANCEL));
-
-        cancelBtn.setOnClickListener(new Button.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                onBackPressed();
-            }
-        });
-
-        buttonLayout.addView(cancelBtn, cancelParam);
-        ViewUtil.styleAsButton(cancelBtn, false, this, useApplicationTheme);
-        ViewUtil.setPadding(cancelBtn, "5dip", null, "5dip", null);
-        ViewUtil.setMargins(cancelBtn, "4dip", "8dip", "8dip", "8dip");
-        if(!useApplicationTheme) {
-            cancelBtn.setTextSize(Appearance.TEXT_SIZE_MEDIUM_BUTTON);
-        }
-        container.addView(buttonLayout, buttonLayoutParam);
-
-        ActivityHelper.addActionBarIfSupported(this);
-
-        setContentView(container);
+        setContentView(buildContentView());
 
         Drawable icon = null;
         boolean usePayPalActionBarIcon = getIntent().getBooleanExtra(CardIOActivity.EXTRA_USE_PAYPAL_ACTIONBAR_ICON, true);
@@ -590,8 +312,263 @@ public final class DataEntryActivity extends Activity implements TextWatcher {
 
     }
 
+    private View buildContentView() {
+        RelativeLayout container = new RelativeLayout(this);
+        if( !useApplicationTheme ) {
+            container.setBackgroundColor(Appearance.DEFAULT_BACKGROUND_COLOR);
+        }
+        ScrollView scrollView = new ScrollView(this);
+        scrollView.setId(viewIdCounter++);
+        RelativeLayout.LayoutParams scrollParams = new RelativeLayout.LayoutParams(
+                LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
+        scrollParams.addRule(RelativeLayout.ALIGN_PARENT_TOP);
+        container.addView(scrollView, scrollParams);
+
+        LinearLayout wrapperLayout = new LinearLayout(this);
+        wrapperLayout.setOrientation(LinearLayout.VERTICAL);
+        scrollView.addView(wrapperLayout, LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT);
+
+        LinearLayout mainLayout = new LinearLayout(this);
+        mainLayout.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams mainParams = new LinearLayout.LayoutParams(
+                LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT);
+
+        addCardNumberImageOrField(mainLayout);
+        addDataEntryFields(mainLayout);
+
+        wrapperLayout.addView(mainLayout, mainParams);
+        ViewUtil.setMargins(mainLayout, Appearance.CONTAINER_MARGIN_HORIZONTAL,
+                Appearance.CONTAINER_MARGIN_VERTICAL, Appearance.CONTAINER_MARGIN_HORIZONTAL,
+                Appearance.CONTAINER_MARGIN_VERTICAL);
+
+        addButtonLayout(container, scrollParams);
+
+        return container;
+    }
+
+    /*
+     * Card number image or field
+     */
+    private void addCardNumberImageOrField(ViewGroup mainLayout) {
+        if (capture != null) {
+            numberValidator = new CardNumberValidator(capture.cardNumber);
+
+            cardView = new ImageView(this);
+
+            LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(
+                    LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
+            cardView.setPadding(0, 0, 0, paddingPx);
+            cardParams.weight = 1;
+
+            // static access is necessary, else we see weird crashes on some devices.
+            cardView.setImageBitmap(io.card.payment.CardIOActivity.markedCardImage);
+
+            mainLayout.addView(cardView, cardParams);
+            ViewUtil.setMargins(cardView, null, null, null, Appearance.VERTICAL_SPACING);
+
+        } else {
+
+            activityTitleTextView = new TextView(this);
+            activityTitleTextView.setTextSize(24);
+            if(! useApplicationTheme ) {
+                activityTitleTextView.setTextColor(Appearance.PAY_BLUE_COLOR);
+            }
+            mainLayout.addView(activityTitleTextView);
+            ViewUtil.setPadding(activityTitleTextView, null, null, null,
+                    Appearance.VERTICAL_SPACING);
+            ViewUtil.setDimensions(activityTitleTextView, LayoutParams.WRAP_CONTENT,
+                    LayoutParams.WRAP_CONTENT);
+
+            LinearLayout numberLayout = new LinearLayout(this);
+            numberLayout.setOrientation(LinearLayout.VERTICAL);
+            ViewUtil.setPadding(numberLayout, null, PADDING_DIP, null, PADDING_DIP);
+
+            TextView numberLabel = new TextView(this);
+            ViewUtil.setPadding(numberLabel, labelLeftPadding, null, null, null);
+            numberLabel.setText(LocalizedStrings.getString(StringKey.ENTRY_CARD_NUMBER));
+            if(! useApplicationTheme ) {
+                numberLabel.setTextColor(Appearance.TEXT_COLOR_LABEL);
+            }
+            numberLayout.addView(numberLabel, LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
+
+            numberEdit = new EditText(this);
+            numberEdit.setId(editTextIdCounter++);
+            numberEdit.setMaxLines(1);
+            numberEdit.setImeOptions(EditorInfo.IME_ACTION_DONE);
+            numberEdit.setTextAppearance(getApplicationContext(),
+                    android.R.attr.textAppearanceLarge);
+            numberEdit.setInputType(InputType.TYPE_CLASS_PHONE);
+            numberEdit.setHint("1234 5678 1234 5678");
+            if(! useApplicationTheme ) {
+                numberEdit.setHintTextColor(Appearance.TEXT_COLOR_EDIT_TEXT_HINT);
+            }
+
+            numberValidator = new CardNumberValidator();
+            numberEdit.addTextChangedListener(numberValidator);
+            numberEdit.addTextChangedListener(this);
+            numberEdit.setFilters(new InputFilter[] { new DigitsKeyListener(), numberValidator });
+
+            numberLayout.addView(numberEdit, LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
+            mainLayout.addView(numberLayout, LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT);
+        }
+    }
+
+    /*
+     * Data entry fields
+     */
+    private void addDataEntryFields(ViewGroup mainLayout) {
+        LinearLayout optionLayout = new LinearLayout(this);
+        LinearLayout.LayoutParams optionLayoutParam = new LinearLayout.LayoutParams(
+                LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
+        ViewUtil.setPadding(optionLayout, null, PADDING_DIP, null, PADDING_DIP);
+        optionLayout.setOrientation(LinearLayout.HORIZONTAL);
+
+        addExpiryIfNeeded(optionLayout);
+        addCvvIfNeeded(optionLayout);
+        addPostalCodeIfNeeded(optionLayout);
+        mainLayout.addView(optionLayout, optionLayoutParam);
+
+        addCardholderNameIfNeeded(mainLayout);
+    }
+
+    private void addExpiryIfNeeded(ViewGroup optionLayout) {
+        if (requireExpiry) {
+            LinearLayout expiryLayout = new LinearLayout(this);
+            LinearLayout.LayoutParams expiryLayoutParam = new LinearLayout.LayoutParams(0,
+                    LayoutParams.MATCH_PARENT, 1);
+            expiryLayout.setOrientation(LinearLayout.VERTICAL);
+
+            TextView expiryLabel = new TextView(this);
+            if(! useApplicationTheme ) {
+                expiryLabel.setTextColor(Appearance.TEXT_COLOR_LABEL);
+            }
+            expiryLabel.setText(LocalizedStrings.getString(StringKey.ENTRY_EXPIRES));
+            ViewUtil.setPadding(expiryLabel, labelLeftPadding, null, null, null);
+
+            expiryLayout.addView(expiryLabel, LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
+
+            expiryEdit = new EditText(this);
+            expiryEdit.setId(editTextIdCounter++);
+            expiryEdit.setMaxLines(1);
+            expiryEdit.setImeOptions(EditorInfo.IME_ACTION_DONE);
+            expiryEdit.setTextAppearance(getApplicationContext(),
+                    android.R.attr.textAppearanceLarge);
+            expiryEdit.setInputType(InputType.TYPE_CLASS_PHONE);
+            expiryEdit.setHint(LocalizedStrings.getString(StringKey.EXPIRES_PLACEHOLDER));
+            if(! useApplicationTheme ) {
+                expiryEdit.setHintTextColor(Appearance.TEXT_COLOR_EDIT_TEXT_HINT);
+            }
+
+            if (capture != null) {
+                expiryValidator = new ExpiryValidator(capture.expiryMonth, capture.expiryYear);
+            } else {
+                expiryValidator = new ExpiryValidator();
+            }
+            if (expiryValidator.hasFullLength()) {
+                expiryEdit.setText(expiryValidator.getValue());
+            }
+            expiryEdit.addTextChangedListener(expiryValidator);
+            expiryEdit.addTextChangedListener(this);
+            expiryEdit.setFilters(new InputFilter[] { new DateKeyListener(), expiryValidator });
+
+            expiryLayout.addView(expiryEdit, LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
+            optionLayout.addView(expiryLayout, expiryLayoutParam);
+            ViewUtil.setMargins(expiryLayout, null, null,
+                    (requireCVV || requirePostalCode) ? FIELD_HALF_GUTTER : null, null);
+        } else {
+            expiryValidator = new AlwaysValid();
+        }
+    }
+
+    private void addCvvIfNeeded(ViewGroup optionLayout) {
+        if (requireCVV) {
+            LinearLayout cvvLayout = new LinearLayout(this);
+            LinearLayout.LayoutParams cvvLayoutParam = new LinearLayout.LayoutParams(0,
+                    LayoutParams.MATCH_PARENT, 1);
+            cvvLayout.setOrientation(LinearLayout.VERTICAL);
+
+            TextView cvvLabel = new TextView(this);
+            if(! useApplicationTheme ) {
+                cvvLabel.setTextColor(Appearance.TEXT_COLOR_LABEL);
+            }
+            ViewUtil.setPadding(cvvLabel, labelLeftPadding, null, null, null);
+            cvvLabel.setText(LocalizedStrings.getString(StringKey.ENTRY_CVV));
+
+            cvvLayout.addView(cvvLabel, LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
+
+            cvvEdit = new EditText(this);
+            cvvEdit.setId(editTextIdCounter++);
+            cvvEdit.setMaxLines(1);
+            cvvEdit.setImeOptions(EditorInfo.IME_ACTION_DONE);
+            cvvEdit.setTextAppearance(getApplicationContext(), android.R.attr.textAppearanceLarge);
+            cvvEdit.setInputType(InputType.TYPE_CLASS_PHONE);
+            cvvEdit.setHint("123");
+            if(! useApplicationTheme ) {
+                cvvEdit.setHintTextColor(Appearance.TEXT_COLOR_EDIT_TEXT_HINT);
+            }
+
+            int length = 4;
+            if (capture != null) {
+                CardType type = CardType.fromCardNumber(numberValidator.getValue());
+                length = type.cvvLength();
+            }
+            cvvValidator = new FixedLengthValidator(length);
+            cvvEdit.setFilters(new InputFilter[] { new DigitsKeyListener(), cvvValidator });
+            cvvEdit.addTextChangedListener(cvvValidator);
+            cvvEdit.addTextChangedListener(this);
+
+            cvvLayout.addView(cvvEdit, LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
+            optionLayout.addView(cvvLayout, cvvLayoutParam);
+            ViewUtil.setMargins(cvvLayout, requireExpiry ? FIELD_HALF_GUTTER : null, null,
+                    requirePostalCode ? FIELD_HALF_GUTTER : null, null);
+        } else {
+            cvvValidator = new AlwaysValid();
+        }
+    }
+
+    private void addPostalCodeIfNeeded(ViewGroup optionLayout) {
+        if (requirePostalCode) {
+            LinearLayout postalCodeLayout = new LinearLayout(this);
+            LinearLayout.LayoutParams postalCodeLayoutParam = new LinearLayout.LayoutParams(0,
+                    LayoutParams.MATCH_PARENT, 1);
+            postalCodeLayout.setOrientation(LinearLayout.VERTICAL);
+
+            TextView zipLabel = new TextView(this);
+            if(! useApplicationTheme ) {
+                zipLabel.setTextColor(Appearance.TEXT_COLOR_LABEL);
+            }
+            ViewUtil.setPadding(zipLabel, labelLeftPadding, null, null, null);
+            zipLabel.setText(LocalizedStrings.getString(StringKey.ENTRY_POSTAL_CODE));
+
+            postalCodeLayout
+                    .addView(zipLabel, LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
+
+            postalCodeEdit = new EditText(this);
+            postalCodeEdit.setId(editTextIdCounter++);
+            postalCodeEdit.setMaxLines(1);
+            postalCodeEdit.setImeOptions(EditorInfo.IME_ACTION_DONE);
+            postalCodeEdit.setTextAppearance(getApplicationContext(),
+                    android.R.attr.textAppearanceLarge);
+            postalCodeEdit.setInputType(InputType.TYPE_CLASS_TEXT);
+            if(! useApplicationTheme ) {
+                postalCodeEdit.setHintTextColor(Appearance.TEXT_COLOR_EDIT_TEXT_HINT);
+            }
+
+            postalCodeValidator = new MaxLengthValidator(MAX_POSTAL_CODE_LENGTH);
+            postalCodeEdit.addTextChangedListener(postalCodeValidator);
+            postalCodeEdit.addTextChangedListener(this);
+
+            postalCodeLayout.addView(postalCodeEdit, LayoutParams.MATCH_PARENT,
+                    LayoutParams.WRAP_CONTENT);
+            optionLayout.addView(postalCodeLayout, postalCodeLayoutParam);
+            ViewUtil.setMargins(postalCodeLayout, (requireExpiry || requireCVV) ? FIELD_HALF_GUTTER
+                    : null, null, null, null);
+        } else {
+            postalCodeValidator = new AlwaysValid();
+        }
+    }
+
     private void addCardholderNameIfNeeded(ViewGroup mainLayout) {
-        boolean requireCardholderName = getIntent().getBooleanExtra(CardIOActivity.EXTRA_REQUIRE_CARDHOLDER_NAME, false);
         if (requireCardholderName) {
             LinearLayout cardholderNameLayout = new LinearLayout(this);
             ViewUtil.setPadding(cardholderNameLayout, null, PADDING_DIP, null, null);
@@ -629,6 +606,73 @@ public final class DataEntryActivity extends Activity implements TextWatcher {
                     LayoutParams.WRAP_CONTENT);
         } else {
             cardholderNameValidator = new AlwaysValid();
+        }
+    }
+
+    /*
+     * Confirmation buttons
+     */
+    private void addButtonLayout(ViewGroup container, RelativeLayout.LayoutParams scrollParams) {
+        LinearLayout buttonLayout = new LinearLayout(this);
+        buttonLayout.setId(viewIdCounter++);
+        RelativeLayout.LayoutParams buttonLayoutParam = new RelativeLayout.LayoutParams(
+                LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
+        buttonLayoutParam.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
+        buttonLayout.setPadding(0, paddingPx, 0, 0);
+        buttonLayout.setBackgroundColor(Color.TRANSPARENT);
+
+        scrollParams.addRule(RelativeLayout.ABOVE, buttonLayout.getId());
+
+        addCancelButton(buttonLayout);
+        addDoneButton(buttonLayout);
+
+        container.addView(buttonLayout, buttonLayoutParam);
+    }
+
+    private void addCancelButton(ViewGroup buttonLayout) {
+        cancelBtn = new Button(this);
+
+        LinearLayout.LayoutParams cancelParam = new LinearLayout.LayoutParams(
+                LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT, 1);
+        cancelBtn.setText(LocalizedStrings.getString(StringKey.CANCEL));
+
+        cancelBtn.setOnClickListener(new Button.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                onBackPressed();
+            }
+        });
+
+        buttonLayout.addView(cancelBtn, cancelParam);
+        ViewUtil.styleAsButton(cancelBtn, false, this, useApplicationTheme);
+        ViewUtil.setPadding(cancelBtn, "5dip", null, "5dip", null);
+        ViewUtil.setMargins(cancelBtn, "4dip", "8dip", "8dip", "8dip");
+        if(!useApplicationTheme) {
+            cancelBtn.setTextSize(Appearance.TEXT_SIZE_MEDIUM_BUTTON);
+        }
+    }
+
+    private void addDoneButton(ViewGroup buttonLayout) {
+        doneBtn = new Button(this);
+        LinearLayout.LayoutParams doneParam = new LinearLayout.LayoutParams(
+                LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT, 1);
+
+        doneBtn.setText(LocalizedStrings.getString(StringKey.DONE));
+        doneBtn.setOnClickListener(new Button.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                completed();
+            }
+        });
+
+        doneBtn.setEnabled(false);
+
+        buttonLayout.addView(doneBtn, doneParam);
+        ViewUtil.styleAsButton(doneBtn, true, this, useApplicationTheme);
+        ViewUtil.setPadding(doneBtn, "5dip", null, "5dip", null);
+        ViewUtil.setMargins(doneBtn, "8dip", "8dip", "8dip", "8dip");
+        if(!useApplicationTheme) {
+            doneBtn.setTextSize(Appearance.TEXT_SIZE_MEDIUM_BUTTON);
         }
     }
 }

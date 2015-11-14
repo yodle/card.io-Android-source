@@ -91,7 +91,7 @@ public class Appearance {
     public static Drawable buttonBackgroundPrimary(Context context) {
         StateListDrawable d = new StateListDrawable();
         d.addState(BUTTON_STATE_PRESSED, new ColorDrawable(BUTTON_PRIMARY_PRESSED_COLOR));
-        d.addState(BUTTON_STATE_DISABLED, new ColorDrawable(BUTTON_PRIMARY_DISABLED_COLOR));
+        d.addState(BUTTON_STATE_DISABLED, buttonBackgroundPrimaryDisabled(context));
         d.addState(BUTTON_STATE_FOCUSED, buttonBackgroundPrimaryFocused(context));
         d.addState(BUTTON_STATE_NORMAL, buttonBackgroundPrimaryNormal(context));
         return d;
@@ -109,6 +109,10 @@ public class Appearance {
         return buttonNormal(BUTTON_PRIMARY_NORMAL_COLOR, getFocusBorderWidthPixels(context));
     }
 
+    private static Drawable buttonBackgroundPrimaryDisabled(Context context) {
+        return buttonNormal(BUTTON_PRIMARY_DISABLED_COLOR, getFocusBorderWidthPixels(context));
+    }
+
     private static Drawable buttonBackgroundPrimaryFocused(Context context) {
         return buttonFocused(
                 BUTTON_PRIMARY_NORMAL_COLOR, BUTTON_PRIMARY_FOCUS_COLOR,
@@ -118,7 +122,7 @@ public class Appearance {
     public static Drawable buttonBackgroundSecondary(Context context) {
         StateListDrawable d = new StateListDrawable();
         d.addState(BUTTON_STATE_PRESSED, new ColorDrawable(BUTTON_SECONDARY_PRESSED_COLOR));
-        d.addState(BUTTON_STATE_DISABLED, new ColorDrawable(BUTTON_SECONDARY_DISABLED_COLOR));
+        d.addState(BUTTON_STATE_DISABLED, buttonBackgroundSecondaryDisabled(context));
         d.addState(BUTTON_STATE_FOCUSED, buttonBackgroundSecondaryFocused(context));
         d.addState(BUTTON_STATE_NORMAL, buttonBackgroundSecondaryNormal(context));
         return d;
@@ -126,6 +130,10 @@ public class Appearance {
 
     private static Drawable buttonBackgroundSecondaryNormal(Context context) {
         return buttonNormal(BUTTON_SECONDARY_NORMAL_COLOR, getFocusBorderWidthPixels(context));
+    }
+
+    private static Drawable buttonBackgroundSecondaryDisabled(Context context) {
+        return buttonNormal(BUTTON_SECONDARY_DISABLED_COLOR, getFocusBorderWidthPixels(context));
     }
 
     private static Drawable buttonBackgroundSecondaryFocused(Context context) {
